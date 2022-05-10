@@ -1,0 +1,2 @@
+class PortCheckError(Exception):
+    pass
