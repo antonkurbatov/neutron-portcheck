@@ -33,7 +33,7 @@ appending **port_check** to **service_plugins** in **[DEFAULT]**:
 https://github.com/antonkurbatov/neutron-portcheck-client
 
 
-Using Nueton Port-check extenstion:
+Using Neutron Port-check extenstion:
 ========================
 
 1. Create some port (via an instance creation or some other way).
