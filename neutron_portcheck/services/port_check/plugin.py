@@ -11,9 +11,10 @@ from neutron_lib.plugins import utils as p_utils
 from oslo_log import log as logging
 import oslo_messaging
 
+from neutron_portcheck import exceptions
+from neutron_portcheck import utils
 from neutron_portcheck.agent.l2.extensions import constants
 from neutron_portcheck.extensions import port_check
-from neutron_portcheck import utils
 
 
 LOG = logging.getLogger(__name__)
