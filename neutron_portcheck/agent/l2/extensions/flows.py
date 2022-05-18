@@ -99,7 +99,7 @@ class Flows(object):
             key = keys_map.get(key, key)
             if key in ['reg5', 'reg6']:
                 value = hex(value)
-            if key in ['nw_src', 'nw_dst']:
+            if key in ['nw_src', 'nw_dst', 'ipv6_src', 'ipv6_dst']:
                 ip_net = netaddr.IPNetwork(value)
                 if ((ip_net.version == 4 and ip_net.prefixlen == 32) or
                         (ip_net.version == 6 and ip_net.prefixlen == 128)):
