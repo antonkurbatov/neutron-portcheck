@@ -27,7 +27,24 @@ class Flows(object):
 
     @staticmethod
     def _numeric_ct_state(ct_state):
-        return ovs_firewall.OVSFirewallDriver._numeric_ct_state(ct_state)
+        CT_BITS = dict([(b, a) for a, b in enumerate([
+            "new", "est", "rel", "rpl",
+            "inv", "trk", "snat", "dnat"])])
+        SENTINEL = '+-'
+        ct_state += SENTINEL
+        LOG.debug("ct_state: %s", ct_state)
+        val = 0
+        mask = 0
+        while ct_state != SENTINEL:
+            pm = ct_state[0]
+            ct_state = ct_state[1:]
+            nextpos = min([ct_state.find(sep) for sep in ['+', '-']])
+            bit = 1 << CT_BITS[ct_state[:nextpos]]
+            mask |= bit
+            if pm == '+':
+                val |= bit
+            ct_state = ct_state[nextpos:]
+        return (val, mask)
 
     def _check_ct_state(self, flow, value):
         # ct_state items are not ordered, that is why needs to
@@ -97,13 +114,18 @@ class Flows(object):
 
         for key, value in kwargs.items():
             key = keys_map.get(key, key)
-            if key in ['reg5', 'reg6']:
+            if key in ('reg5', 'reg6'):
                 value = hex(value)
-            if key in ['nw_src', 'nw_dst', 'ipv6_src', 'ipv6_dst']:
+            if key in ('nw_src', 'nw_dst', 'ipv6_src', 'ipv6_dst'):
                 ip_net = netaddr.IPNetwork(value)
                 if ((ip_net.version == 4 and ip_net.prefixlen == 32) or
                         (ip_net.version == 6 and ip_net.prefixlen == 128)):
                     value = str(ip_net.ip)
+            if key in ('dl_dst', 'dl_src') and isinstance(value, tuple):
+                # eth_dst=("00:00:00:00:00:00", "01:00:00:00:00:00")
+                # ->
+                # dl_dst=00:00:00:00:00:00/01:00:00:00:00:00
+                value = '/'.join(value)
             if key == 'dl_vlan':
                 value = value ^ 0x1000
             if key == 'ct_mark' and value != 0:
@@ -111,12 +133,25 @@ class Flows(object):
             if key == 'actions':
                 for cur, new in actions_map.items():
                     value = value.replace(cur, new)
+
                 while 'set_field' in value:
+                    m = re.search('(.*)set_field:(\d+)->vlan_vid(.*)', value)
+                    if m:
+                        # push_vlan:0x8100,set_field:0x1003->vlan_vid
+                        # ->
+                        # mod_vlan_vid:3
+                        head, vlan_tag, tail = m.groups()
+                        value = '{}mod_vlan_vid:{}{}'.format(
+                            head, int(vlan_tag) ^ 0x1000, tail)
+                        value = value.replace('push_vlan:%d,' % 0x8100, '')
+                        continue
                     m = re.search('(.*)set_field:(\d+)(.*)', value)
-                    if not m:
-                        break
-                    head, load, tail = m.groups()
-                    value = '{}load:{}{}'.format(head, hex(int(load)), tail)
+                    if m:
+                        head, load, tail = m.groups()
+                        value = '{}load:{}{}'.format(
+                            head, hex(int(load)), tail)
+                        continue
+                    raise ValueError('Unknown set_field format: %s' % value)
             if key == 'eth_type':
                 eth_type = kwargs['eth_type']
                 ip_proto = kwargs.get('ip_proto', None)

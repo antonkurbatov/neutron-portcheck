@@ -137,9 +137,7 @@ class PortCheckAgentExtension(l2_extension.L2AgentExtension):
     def port_check(self, context, **kwargs):
         port_primitive = kwargs['port']
         port = port_obj.Port.clean_obj_from_primitive(port_primitive)
-        if net.is_port_trusted(port):
-            raise exceptions.PortCheckError(
-                'Trusted port check not implemented yet')
+
         # Intentionally use SecurityGroupServerRpcApi to honestly pull
         # data from the DB.
         sg_plugin_rpc = sg_rpc.SecurityGroupServerRpcApi('q-plugin')
@@ -149,20 +147,23 @@ class PortCheckAgentExtension(l2_extension.L2AgentExtension):
         security_groups = devices_info['security_groups']
         sg_member_ips = devices_info['sg_member_ips']
 
-        port_dict = devices.get(port.id)
-        if not port_dict:
-            raise exceptions.PortCheckError(
-                'Cannot find device by port_id: %s' % port.id)
-
         firewall = OVSFirewallDriver(self.agent_api.br_int)
         for sg_id, sg_rules in security_groups.items():
             firewall.update_security_group_rules(sg_id, sg_rules)
         for remote_sg_id, member_ips in sg_member_ips.items():
             firewall.update_security_group_members(
                 remote_sg_id, member_ips)
-        
+
         firewall._initialize_firewall()
-        firewall.prepare_port_filter(port_dict)
+        if net.is_port_trusted(port):
+            firewall.process_trusted_ports([port.id])
+        else:
+            port_dict = devices.get(port.id)
+            if not port_dict:
+                raise exceptions.PortCheckError(
+                    'Cannot find device by port_id: %s' % port.id)
+            firewall.prepare_port_filter(port_dict)
+
         return firewall.get_errors()
 
     def handle_port(self, context, port):
