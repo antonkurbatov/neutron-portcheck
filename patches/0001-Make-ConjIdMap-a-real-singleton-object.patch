@@ -1,0 +1,41 @@
+From c873ab305ae69f2501d79d897058b594a5f3b578 Mon Sep 17 00:00:00 2001
+From: Anton Kurbatov <bxfree@gmail.com>
+Date: Tue, 10 Oct 2023 09:29:02 -0400
+Subject: [PATCH] Make ConjIdMap a real singleton object
+
+---
+ neutron/agent/linux/openvswitch_firewall/firewall.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/neutron/agent/linux/openvswitch_firewall/firewall.py b/neutron/agent/linux/openvswitch_firewall/firewall.py
+index 1a8ffa539a..a5477b81cd 100644
+--- a/neutron/agent/linux/openvswitch_firewall/firewall.py
++++ b/neutron/agent/linux/openvswitch_firewall/firewall.py
+@@ -268,12 +268,16 @@ class ConjIdMap(object):
+     CONJ_ID_BLOCK_SIZE = 8
+     MAX_CONJ_ID = 2 ** 32 - 8
+ 
++    _initialized = False
++
+     def __new__(cls, int_br):
+         if not hasattr(cls, '_instance'):
+             cls._instance = super(ConjIdMap, cls).__new__(cls)
+         return cls._instance
+ 
+     def __init__(self, int_br):
++        if self.__class__._initialized:
++            return
+         self.id_map = collections.defaultdict(self._conj_id_factory)
+         # Stores the set of conjunction IDs used for each unique tuple
+         # (sg_id, remote_id, direction, ethertype). Each tuple
+@@ -281,6 +285,7 @@ class ConjIdMap(object):
+         self.id_map_group = collections.defaultdict(set)
+         self.id_free = collections.deque()
+         self._max_id = self._init_max_id(int_br)
++        self.__class__._initialized = True
+ 
+     def _init_max_id(self, int_br):
+         """Read the maximum conjunction ID number in the integration bridge
+-- 
+2.39.3
+
