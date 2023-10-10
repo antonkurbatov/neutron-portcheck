@@ -287,7 +287,6 @@ class OVSFirewallDriver(ovs_firewall.OVSFirewallDriver):
 
     def __init__(self, integration_bridge):
         super().__init__(integration_bridge)
-        LOG.info('CCCCCCC')
         # subsciption is not needed:
         callbacks_registry.unsubscribe(
             self._init_firewall_callback,
